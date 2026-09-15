@@ -20,21 +20,10 @@ tree. So you end up running them one at a time, which is the slowest way to use 
 Zordon gives every task its own **git worktree**, its own **branch**, and its own
 **agent process** — then puts all of them on one screen.
 
-```
- ZORDON  command center                                    3 running · 1 idle · 0 failed
- ────────────────────────────────────────────────────────────────────────────────────────
- ▸ ● fix-flaky-auth-test      +48 -12    4m21s   fix the flaky auth test
-   ● add-health-endpoint      +96 -3     2m05s   add a /health endpoint with tests
-   ● migrate-to-pg-16         +12 -140   1m12s   migrate the schema to postgres 16
-   ✓ rename-user-service      +31 -31    8m44s   rename UserService to AccountService
- ────────────────────────────────────────────────────────────────────────────────────────
-   output · diff  zordon/fix-flaky-auth-test
- @@ -18,7 +18,7 @@ func TestLogin(t *testing.T) {
- -	time.Sleep(100 * time.Millisecond)
- +	waitFor(t, func() bool { return server.Ready() })
- ────────────────────────────────────────────────────────────────────────────────────────
-   n summon · m merge · s stop · x dismiss · a attach · tab output/diff · q quit
-```
+<p align="center">
+  <img src="docs/demo.gif" alt="Three agents working in parallel in the Zordon dashboard, then one of them merged" width="960">
+</p>
+
 
 Agents never share a working tree, so they never collide. You review the diffs side by
 side and merge the ones that landed.
