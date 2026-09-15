@@ -175,7 +175,9 @@ func (r *Repo) Diff(base, branch string) (string, error) {
 // to base: committed work, uncommitted edits, and new files it has not added yet.
 func (r *Repo) WorktreeStat(worktree, base string) (Stat, error) {
 	var stat Stat
-	out, err := run(worktree, "diff", "--shortstat", base)
+	ref := r.forkPoint(worktree, base)
+
+	out, err := run(worktree, "diff", "--shortstat", ref)
 	if err != nil {
 		return stat, err
 	}
@@ -189,7 +191,7 @@ func (r *Repo) WorktreeStat(worktree, base string) (Stat, error) {
 		stat.Files++
 		stat.Insertions += countLines(filepath.Join(worktree, name))
 	}
-	if count, err := run(worktree, "rev-list", "--count", base+"..HEAD"); err == nil {
+	if count, err := run(worktree, "rev-list", "--count", ref+"..HEAD"); err == nil {
 		stat.Commits, _ = strconv.Atoi(strings.TrimSpace(count))
 	}
 	return stat, nil
@@ -198,7 +200,7 @@ func (r *Repo) WorktreeStat(worktree, base string) (Stat, error) {
 // WorktreeDiff returns the full patch a ranger has produced, new files included,
 // without touching its index.
 func (r *Repo) WorktreeDiff(worktree, base string) (string, error) {
-	patch, err := run(worktree, "diff", base)
+	patch, err := run(worktree, "diff", r.forkPoint(worktree, base))
 	if err != nil {
 		return "", err
 	}
@@ -216,6 +218,18 @@ func (r *Repo) WorktreeDiff(worktree, base string) (string, error) {
 		b.WriteString(out)
 	}
 	return b.String(), nil
+}
+
+// forkPoint resolves where a worktree's branch left base. Comparing against it
+// rather than against base itself keeps a ranger's diff meaning "what this
+// ranger changed" after someone else's work has already landed on base -
+// otherwise every other ranger appears to delete it.
+func (r *Repo) forkPoint(worktree, base string) string {
+	out, err := run(worktree, "merge-base", base, "HEAD")
+	if err != nil {
+		return base
+	}
+	return strings.TrimSpace(out)
 }
 
 func (r *Repo) untracked(worktree string) ([]string, error) {

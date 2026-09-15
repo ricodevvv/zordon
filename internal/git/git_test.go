@@ -258,3 +258,50 @@ func TestCountLines(t *testing.T) {
 		t.Errorf("countLines on a missing file = %d, want 0", got)
 	}
 }
+
+func TestWorktreeStatIgnoresWorkLandedOnBaseAfterTheFork(t *testing.T) {
+	repo := newTestRepo(t)
+
+	mine := filepath.Join(t.TempDir(), "mine")
+	if err := repo.AddWorktree(mine, "zordon/mine", "main"); err != nil {
+		t.Fatalf("AddWorktree: %v", err)
+	}
+	writeFile(t, mine, "mine.txt", "a\nb\n")
+
+	before, err := repo.WorktreeStat(mine, "main")
+	if err != nil {
+		t.Fatalf("WorktreeStat: %v", err)
+	}
+
+	// Someone else's ranger lands on main while this one is still working.
+	theirs := filepath.Join(t.TempDir(), "theirs")
+	if err := repo.AddWorktree(theirs, "zordon/theirs", "main"); err != nil {
+		t.Fatalf("AddWorktree: %v", err)
+	}
+	writeFile(t, theirs, "theirs.txt", "x\ny\nz\n")
+	if _, err := repo.Commit(theirs, "their work"); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+	if err := repo.Merge("main", "zordon/theirs", false); err != nil {
+		t.Fatalf("Merge: %v", err)
+	}
+
+	after, err := repo.WorktreeStat(mine, "main")
+	if err != nil {
+		t.Fatalf("WorktreeStat after the merge: %v", err)
+	}
+	if after != before {
+		t.Errorf("WorktreeStat = %+v after an unrelated merge, want %+v", after, before)
+	}
+	if after.Deletions != 0 {
+		t.Errorf("Deletions = %d, want 0: this ranger deleted nothing", after.Deletions)
+	}
+
+	patch, err := repo.WorktreeDiff(mine, "main")
+	if err != nil {
+		t.Fatalf("WorktreeDiff: %v", err)
+	}
+	if strings.Contains(patch, "theirs.txt") {
+		t.Errorf("WorktreeDiff mentions another ranger's file:\n%s", patch)
+	}
+}
