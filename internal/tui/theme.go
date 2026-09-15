@@ -81,6 +81,7 @@ func Truncate(s string, width int) string {
 }
 
 // Pad right-pads s with spaces to exactly width, truncating when too long.
+// It measures raw runes, so it takes plain text: styling belongs on the result.
 func Pad(s string, width int) string {
 	s = Truncate(s, width)
 	for lipgloss.Width(s) < width {

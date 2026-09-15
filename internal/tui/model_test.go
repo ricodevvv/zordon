@@ -6,7 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/ricodevvv/zordon/internal/fleet"
+	"github.com/ricodevvv/zordon/internal/git"
 	"github.com/ricodevvv/zordon/internal/state"
 )
 
@@ -123,5 +127,34 @@ func TestListHeightYieldsToTheDetailPane(t *testing.T) {
 	}
 	if got := strings.Count(m.list(), "\n") + 1; got != m.listHeight() {
 		t.Errorf("list() rendered %d lines, want listHeight() = %d", got, m.listHeight())
+	}
+}
+
+func TestListShowsTheDiffBadge(t *testing.T) {
+	m := newTestModel(1, 100, 30)
+	m.rangers[0].Stat = git.Stat{Files: 2, Insertions: 48, Deletions: 12}
+
+	row := m.list()
+	plain := ansi.Strip(row)
+
+	// The badge is styled before it is padded, so a rune-counting pad would eat
+	// the escape sequence and drop the counts entirely.
+	if !strings.Contains(plain, "+48") || !strings.Contains(plain, "-12") {
+		t.Errorf("list() = %q, want the insertion and deletion counts", plain)
+	}
+	if !strings.Contains(plain, "ranger-0") {
+		t.Errorf("list() = %q, want the ranger name", plain)
+	}
+}
+
+func TestDiffBadgeKeepsItsColumnWidth(t *testing.T) {
+	for _, tc := range []struct{ added, removed int }{{0, 0}, {1, 0}, {48, 12}, {123456, 654321}} {
+		badge := diffBadge(tc.added, tc.removed, diffBadgeWidth)
+		if got := lipgloss.Width(badge); got < diffBadgeWidth {
+			t.Errorf("width of diffBadge(%d, %d) = %d, want at least %d", tc.added, tc.removed, got, diffBadgeWidth)
+		}
+		if ansi.Strip(badge) == "" {
+			t.Errorf("diffBadge(%d, %d) rendered nothing", tc.added, tc.removed)
+		}
 	}
 }

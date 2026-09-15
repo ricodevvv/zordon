@@ -16,6 +16,8 @@ const (
 	minDetailHeight = 3
 	// maxListedRangers caps the ranger list so the detail pane keeps its room.
 	maxListedRangers = 8
+	// diffBadgeWidth is the fixed column the +/- counts sit in.
+	diffBadgeWidth = 14
 )
 
 var (
@@ -79,7 +81,7 @@ func (m *Model) list() string {
 		rows = append(rows, strings.Join([]string{
 			cursor + StatusStyle(r.Status).Render(StatusIcon(r.Status)),
 			name,
-			Pad(diffBadge(r.Stat.Insertions, r.Stat.Deletions), 14),
+			diffBadge(r.Stat.Insertions, r.Stat.Deletions, diffBadgeWidth),
 			styleMuted.Render(Pad(FormatDuration(r.Duration()), 7)),
 			styleMuted.Render(Truncate(r.Task, taskWidth)),
 		}, " "))
@@ -139,11 +141,18 @@ func rule(width int) string {
 	return styleRule.Render(strings.Repeat("─", width))
 }
 
-func diffBadge(added, removed int) string {
-	if added == 0 && removed == 0 {
-		return styleMuted.Render("—")
+// diffBadge renders the +/- counts padded to width. It pads itself rather than
+// going through Pad because its result is already styled, and Pad measures raw
+// runes - it would count the escape sequences and cut the colour off.
+func diffBadge(added, removed, width int) string {
+	text := styleMuted.Render("—")
+	if added != 0 || removed != 0 {
+		text = styleAdded.Render(fmt.Sprintf("+%d", added)) + " " + styleRemoved.Render(fmt.Sprintf("-%d", removed))
 	}
-	return styleAdded.Render(fmt.Sprintf("+%d", added)) + " " + styleRemoved.Render(fmt.Sprintf("-%d", removed))
+	for lipgloss.Width(text) < width {
+		text += " "
+	}
+	return text
 }
 
 // highlightDiff colours patch lines; plain log output is returned untouched.
